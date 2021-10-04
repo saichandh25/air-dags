@@ -1,0 +1,49 @@
+
+if [ $# -ne 2 ]; then
+  echo "Wrong number of arguments"
+  exit 1
+fi
+
+DAG_PATH=com/apple/ap/algo/dags/
+mkdir -p tmp-dags
+cd tmp-dags
+dagLen=0
+dagNm=""
+zipNm=""
+
+git fetch origin master
+git diff --name-only origin/master..HEAD
+for dag in $(git diff --name-only origin/master..HEAD); do
+  echo "publish $dag"
+ IFS="/" read -a dagArry <<<$dag
+  if [[ $dag =~ "dags/" ]]; then
+    dagLen=${#dagArry[@]}
+    if [[ $dagLen -eq 2 && ! -z $zipNm ]]; then
+        echo "flush zip dags from dagLen:$dagLen"
+        zip "${dagNm}.zip $zipNm"
+    elif [[ $dagLen -eq 3 && $dagNm != ${dagArry[1]}  && -z $zipNm ]]; then
+       zipNm=$dag
+       dagNm=${dagArry[1]}
+           elif [[ $dagLen -eq 3 && $dagNm != ${dagArry[1]}  && ! -z $zipNm ]]; then
+             echo "flush zip dags from dagLen:$dagLen"
+             zip "${dagNm}.zip $zipNm"
+       zipNm=$dag
+       dagNm=${dagArry[1]}
+       fileExt="zip"
+    elif [[ $dagLen -eq 3 && $dagNm == ${dagArry[1]} ]]; then
+      zipNm="$zipNm $dag"
+      dagNm=${dagArry[1]}
+      fileExt="zip"
+    else
+      fileExt="py"
+      dag_file=${dag/dags\//""}
+      dag_name=${dag_file/\.$fileExt/""}
+    ci stage-lib ${dag},${DAG_PATH}${dag_name}-$1-$2.$fileExt
+    fi
+  fi
+done
+echo ls -ltr
+
+#ci stage-lib ${dag},${DAG_PATH}${dag_name}-$1-$2.$fileExt
+#clean-up
+#rm tmp-dags
